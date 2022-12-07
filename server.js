@@ -20,11 +20,11 @@ var server = http.createServer(function (request, response) {
   var method = request.method;
 
   /******** 从这里开始看，上面不要看 ************/
-
+  const userArray = JSON.parse(fs.readFileSync("./db/user.json"));
+  const session = JSON.parse(fs.readFileSync("./session.json"));
   console.log("路径（带查询参数）为：" + pathWithQuery);
 
   if (path === "/sign_in" && method === "POST") {
-    const userArray = JSON.parse(fs.readFileSync("./db/user.json"));
     const array = [];
     request.on("data", (chunk) => {
       array.push(chunk);
@@ -41,22 +41,26 @@ var server = http.createServer(function (request, response) {
         response.end(`{"errorCode": 4001}`);
       } else {
         response.statusCode = 200;
-        response.setHeader("Set-Cookie", `user_id=${user.id}; HttpOnly`);
+        let random = Math.random();
+        session[random] = { user_id: user.id };
+        fs.writeFileSync("./session.json", JSON.stringify(session));
+        response.setHeader("Set-Cookie", `session_id=${random}; HttpOnly`);
         response.end("很好");
       }
     });
   } else if (path === "/home.html") {
     const cookie = request.headers["cookie"];
-    let userId;
+    let sessionId;
     try {
-      userId = cookie
+      sessionId = cookie
         .split(";")
-        .filter((s) => s.indexOf("user_id=") >= 0)[0]
+        .filter((s) => s.indexOf("session_id=") >= 0)[0]
         .split("=")[1];
     } catch (error) {}
-    if (userId) {
-      const userArray = JSON.parse(fs.readFileSync("./db/user.json"));
-      const user = userArray.find((user) => user.id.toString() === userId);
+    if (sessionId) {
+      const userId = session[sessionId].user_id;
+      const user = userArray.find((user) => user.id === userId);
+      console.log("user:" + user);
       const homeHtml = fs.readFileSync("./public/home.html").toString();
       let string;
       if (user) {
@@ -130,9 +134,4 @@ var server = http.createServer(function (request, response) {
 });
 
 server.listen(port);
-console.log(
-  "监听 " +
-    port +
-    " 成功\n请用在空中转体720度然后用电饭煲打开 http://localhost:" +
-    port
-);
+console.log("监听 " + port + " 成功\n http://localhost:" + port);
