@@ -41,21 +41,41 @@ var server = http.createServer(function (request, response) {
         response.end(`{"errorCode": 4001}`);
       } else {
         response.statusCode = 200;
-        response.setHeader("Set-Cookie", "logined=1");
+        response.setHeader("Set-Cookie", `user_id=${user.id}; HttpOnly`);
         response.end("很好");
       }
     });
   } else if (path === "/home.html") {
     const cookie = request.headers["cookie"];
-    console.log(cookie);
-    if (cookie) {
+    let userId;
+    try {
+      userId = cookie
+        .split(";")
+        .filter((s) => s.indexOf("user_id=") >= 0)[0]
+        .split("=")[1];
+    } catch (error) {}
+    if (userId) {
+      const userArray = JSON.parse(fs.readFileSync("./db/user.json"));
+      const user = userArray.find((user) => user.id.toString() === userId);
       const homeHtml = fs.readFileSync("./public/home.html").toString();
-      const string = homeHtml.replace(`{{loginStatus}}`, "已登录");
-      response.write(string);
+      let string;
+      if (user) {
+        string = homeHtml
+          .replace(`{{loginStatus}}`, "已登录")
+          .replace(`{{userName}}`, user.name);
+        response.end(string);
+      } else {
+        string = homeHtml
+          .replace(`{{loginStatus}}`, "未登录")
+          .replace(`{{userName}},`, "");
+        response.end(string);
+      }
     } else {
       const homeHtml = fs.readFileSync("./public/home.html").toString();
-      const string = homeHtml.replace(`{{loginStatus}}`, "未登录");
-      response.write(string);
+      const string = homeHtml
+        .replace(`{{loginStatus}}`, "未登录")
+        .replace(`{{userName}},`, "");
+      response.end(string);
     }
   } else if (path === "/register" && method === "POST") {
     response.setHeader("Content-Type", "text/html;charset=utf-8");
